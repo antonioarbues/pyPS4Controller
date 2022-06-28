@@ -1,7 +1,15 @@
 import os
 import struct
 import time
+import enum
 
+class ActionsEnum(enum.Enum):
+    l3_up = 0
+    l3_down = 1
+    r3_left = 2
+    r3_right = 3
+    on_x_press = 4
+    on_down_arrow_press = 5
 
 class Actions:
     """
@@ -79,16 +87,20 @@ class Actions:
         print("on_right_arrow_press")
 
     def on_L3_up(self, value):
-        print("on_L3_up: {}".format(value))
+        # print("on_L3_up: {}".format(value))
+        return value
 
     def on_L3_down(self, value):
-        print("on_L3_down: {}".format(value))
+        # print("on_L3_down: {}".format(value))
+        return value
 
     def on_L3_left(self, value):
-        print("on_L3_left: {}".format(value))
+        # print("on_L3_left: {}".format(value))
+        return value
 
     def on_L3_right(self, value):
-        print("on_L3_right: {}".format(value))
+        # print("on_L3_right: {}".format(value))
+        return value
 
     def on_L3_y_at_rest(self):
         """L3 joystick is at rest after the joystick was moved and let go off"""
@@ -107,16 +119,20 @@ class Actions:
         print("on_L3_release")
 
     def on_R3_up(self, value):
-        print("on_R3_up: {}".format(value))
+        # print("on_R3_up: {}".format(value))
+        return value
 
     def on_R3_down(self, value):
-        print("on_R3_down: {}".format(value))
+        # print("on_R3_down: {}".format(value))
+        return value
 
     def on_R3_left(self, value):
-        print("on_R3_left: {}".format(value))
+        # print("on_R3_left: {}".format(value))
+        return value
 
     def on_R3_right(self, value):
-        print("on_R3_right: {}".format(value))
+        # print("on_R3_right: {}".format(value))
+        return value
 
     def on_R3_y_at_rest(self):
         """R3 joystick is at rest after the joystick was moved and let go off"""
@@ -187,10 +203,10 @@ class Controller(Actions):
 
         if event_definition is None:  # means it wasn't specified by user
             if self.event_format == "LhBB":
-                from pyPS4Controller.event_mapping.DefaultMapping import DefaultMapping
+                from .event_mapping.DefaultMapping import DefaultMapping
                 self.event_definition = DefaultMapping
             else:
-                from pyPS4Controller.event_mapping.Mapping3Bh2b import Mapping3Bh2b
+                from .event_mapping.Mapping3Bh2b import Mapping3Bh2b
                 self.event_definition = Mapping3Bh2b
         else:
             self.event_definition = event_definition
@@ -223,10 +239,10 @@ class Controller(Actions):
                 on_connect()
 
         def wait_for_interface():
-            print("Waiting for interface: {} to become available . . .".format(self.interface))
+            # print("Waiting for interface: {} to become available . . .".format(self.interface))
             for i in range(timeout):
                 if os.path.exists(self.interface):
-                    print("Successfully bound to: {}.".format(self.interface))
+                    # print("Successfully bound to: {}.".format(self.interface))
                     on_connect_callback()
                     return
                 time.sleep(1)
@@ -253,10 +269,22 @@ class Controller(Actions):
         try:
             _file = open(self.interface, "rb")
             event = read_events()
-            if on_sequence is None:
-                on_sequence = []
-            special_inputs_indexes = [0] * len(on_sequence)
-            while not self.stop and event:
+
+            type = -1
+            value = -2
+            # start = time.time()
+            i = 0
+            while type == -1:
+                # time.sleep(0.01)
+                # if i > 20:  # hack
+                #     wait_for_interface()
+                #     _file = open(self.interface, "rb")
+                #     i = 0
+                event = read_events()
+                if on_sequence is None:
+                    on_sequence = []
+                special_inputs_indexes = [0] * len(on_sequence)
+                # while not self.stop and event:
                 (overflow, value, button_type, button_id) = unpack()
                 if button_id not in self.black_listed_buttons:
                     self.__handle_event(button_id=button_id, button_type=button_type, value=value, overflow=overflow,
@@ -266,7 +294,16 @@ class Controller(Actions):
                     if len(check) != 0:
                         special_inputs_indexes[i] = check[0] + 1
                         special_input["callback"]()
-                event = read_events()
+                # event = read_events()
+
+                type, value = self.__handle_event(button_id, button_type, value, overflow, self.debug)
+                i += 1
+
+                # end = time.time()
+                # if end - start > 0.05:
+                #     break
+            return type, value
+
         except KeyboardInterrupt:
             print("\nExiting (Ctrl + C)")
             on_disconnect_callback()
@@ -288,9 +325,11 @@ class Controller(Actions):
             elif event.R3_x_at_rest():
                 self.on_R3_x_at_rest()
             elif event.R3_right():
-                self.on_R3_right(event.value)
+                # self.on_R3_right(event.value)
+                return ActionsEnum['r3_right'].value, event.value
             elif event.R3_left():
-                self.on_R3_left(event.value)
+                # self.on_R3_left(event.value)
+                return ActionsEnum['r3_left'].value, event.value
             elif event.R3_up():
                 self.on_R3_up(event.value)
             elif event.R3_down():
@@ -302,9 +341,9 @@ class Controller(Actions):
             elif event.L3_x_at_rest():
                 self.on_L3_x_at_rest()
             elif event.L3_up():
-                self.on_L3_up(event.value)
+                return ActionsEnum['l3_up'].value, self.on_L3_up(event.value)
             elif event.L3_down():
-                self.on_L3_down(event.value)
+                return ActionsEnum['l3_down'].value, self.on_L3_down(event.value)
             elif event.L3_left():
                 self.on_L3_left(event.value)
             elif event.L3_right():
@@ -315,8 +354,9 @@ class Controller(Actions):
         elif event.circle_released():
             self.on_circle_release()
         elif event.x_pressed():
-            self.event_history.append("x")
-            self.on_x_press()
+            # self.event_history.append("x")
+            # self.on_x_press()
+            return ActionsEnum["on_x_press"].value, 0.0
         elif event.x_released():
             self.on_x_release()
         elif event.triangle_pressed():
@@ -330,8 +370,9 @@ class Controller(Actions):
         elif event.square_released():
             self.on_square_release()
         elif event.L1_pressed():
-            self.event_history.append("L1")
-            self.on_L1_press()
+            # self.event_history.append("L1")
+            # self.on_L1_press()
+            return ActionsEnum["on_down_arrow_press"].value, 0.0
         elif event.L1_released():
             self.on_L1_release()
         elif event.L2_pressed():
@@ -340,8 +381,9 @@ class Controller(Actions):
         elif event.L2_released():
             self.on_L2_release()
         elif event.R1_pressed():
-            self.event_history.append("R1")
-            self.on_R1_press()
+            # self.event_history.append("R1")
+            # self.on_R1_press()
+            return ActionsEnum["on_x_press"].value, 0.0
         elif event.R1_released():
             self.on_R1_release()
         elif event.R2_pressed():
@@ -368,8 +410,9 @@ class Controller(Actions):
             self.event_history.append("up")
             self.on_up_arrow_press()
         elif event.down_arrow_pressed():
-            self.event_history.append("down")
-            self.on_down_arrow_press()
+            # self.event_history.append("down")
+            # self.on_down_arrow_press()
+            return ActionsEnum["on_down_arrow_press"].value, 0.0
         elif event.playstation_button_pressed():
             self.event_history.append("ps")
             self.on_playstation_button_press()
@@ -390,3 +433,5 @@ class Controller(Actions):
             self.on_L3_press()
         elif event.L3_released():
             self.on_L3_release()
+
+        return -1, -2
